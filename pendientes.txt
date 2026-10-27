@@ -1,0 +1,11 @@
+crear la vista del cuso que quiere entrar
+crear la navbar mas interactiva
+crear logo
+cambiar el nombre
+hacer laweb mas interactiva
+ponerle un fondo de pantalla
+ponerle foto de perfil a los cursos
+ponerle fondo de pantalla a los cursos
+hacer mas interactivo los cursos
+
+punto extra por entregarlo el martes

@@ -2,202 +2,135 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once "csrf.php";
+require_once "helpers.php";
+
+// Obtener el nombre de la página actual
+$pagina_actual = basename($_SERVER['PHP_SELF']);
+$es_pagina_auth = in_array($pagina_actual, ['login.php', 'registro.php']);
+$mostrar_busqueda_cursos = $pagina_actual === "dashboard.php" && ($_GET["seccion"] ?? "") === "cursos";
+
+$user_avatar = null;
+$nav_avatar_src = null;
+
+if (isset($_SESSION["usuario_id"])) {
+    include_once "conexion.php";
+    $stmt_nav = $conexion->prepare("SELECT foto, nombre, apellidos, rol FROM usuarios WHERE id = ?");
+    $stmt_nav->bind_param("i", $_SESSION["usuario_id"]);
+    $stmt_nav->execute();
+    $res_nav = $stmt_nav->get_result();
+    if ($row_nav = $res_nav->fetch_assoc()) {
+        $user_avatar = $row_nav;
+        $foto_val = $user_avatar['foto'] ?? '';
+
+        if (url_https_valida($foto_val)) {
+            $nav_avatar_src = $foto_val;
+        } elseif (!empty($foto_val) && basename($foto_val) === $foto_val && file_exists(__DIR__ . "/uploads/" . $foto_val)) {
+            $nav_avatar_src = "uploads/" . $foto_val;
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cursos Online</title>
+    <title>AprendePlus - Plataforma de Cursos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            --primary-light: #eef2ff;
-            --slate-900: #0f172a;
-            --slate-800: #1e293b;
-            --slate-600: #475569;
-            --slate-500: #64748b;
-            --slate-200: #e2e8f0;
-            --slate-100: #f1f5f9;
-            --slate-50: #f8fafc;
-            --danger: #ef4444;
-            --danger-bg: #fef2f2;
-            --radius-lg: 16px;
-            --radius-md: 10px;
-            --shadow-card: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-
-        body {
-            background: linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
-            color: var(--slate-800);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .top-navbar {
-            width: 100%;
-            background: #ffffff;
-            border-bottom: 1px solid var(--slate-200);
-            padding: 0.85rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            margin-bottom: 2rem;
-        }
-
-        .nav-brand {
-            font-size: 1.15rem;
-            font-weight: 800;
-            color: var(--slate-900);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .nav-brand span {
-            color: var(--primary);
-        }
-
-        .nav-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .nav-badge {
-            background-color: var(--primary-light);
-            color: var(--primary);
-            font-size: 0.75rem;
-            font-weight: 700;
-            padding: 5px 12px;
-            border-radius: 9999px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .btn-nav-logout {
-            padding: 6px 14px;
-            background-color: var(--danger-bg);
-            color: var(--danger);
-            border: 1px solid #fee2e2;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .btn-nav-logout:hover {
-            background-color: var(--danger);
-            color: #ffffff;
-        }
-
-        .container {
-            background: #ffffff;
-            width: 100%;
-            max-width: 480px;
-            padding: 40px 36px;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-card);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            margin-bottom: 40px;
-        }
-
-        h1 {
-            color: var(--slate-900);
-            font-size: 1.7rem;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            margin-bottom: 1.5rem;
-            text-align: center;
-        }
-
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        label {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: var(--slate-600);
-            margin-bottom: -6px;
-        }
-
-        input[type="email"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px 14px;
-            border: 1.5px solid var(--slate-200);
-            border-radius: var(--radius-md);
-            font-size: 0.95rem;
-            outline: none;
-            transition: all 0.2s;
-        }
-
-        input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 4px var(--primary-light);
-        }
-
-        button {
-            background-color: var(--primary);
-            color: #ffffff;
-            border: none;
-            padding: 13px 20px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            margin-top: 10px;
-            transition: background-color 0.2s;
-        }
-
-        button:hover {
-            background-color: var(--primary-hover);
-        }
-
-        .error-box {
-            background-color: var(--danger-bg);
-            color: var(--danger);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            margin-bottom: 12px;
-            text-align: center;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header class="top-navbar">
-        <a href="login.php" class="nav-brand">
-            Cursos<span>Online</span>
-        </a>
-        <div class="nav-actions">
+        <div class="nav-left">
+            <a href="dashboard.php" class="nav-brand">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                </div>
+                <span>Aprende<span class="brand-accent">Plus</span></span>
+            </a>
+
+            <?php if ($mostrar_busqueda_cursos): ?>
+                <div class="nav-search">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="globalSearch" placeholder="Buscar cursos o lecciones..." onkeyup="filterGlobalCourses()">
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="nav-right">
             <?php if (isset($_SESSION["usuario_id"])): ?>
-                <span class="nav-badge"><?php echo htmlspecialchars($_SESSION["rol"]); ?></span>
-                <a href="logout.php" class="btn-nav-logout">Cerrar sesión</a>
+                <div class="user-dropdown-container">
+                    <button class="user-profile-btn" onclick="toggleUserDropdown()">
+                        <?php if ($nav_avatar_src): ?>
+                            <img src="<?php echo htmlspecialchars($nav_avatar_src); ?>" alt="Perfil" class="nav-avatar">
+                        <?php else: ?>
+                            <div class="nav-avatar-initial">
+                                <?php echo strtoupper(substr($user_avatar['nombre'] ?? $_SESSION['nombre'] ?? 'U', 0, 1)); ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="user-meta">
+                            <span class="user-name"><?php echo htmlspecialchars(trim(($user_avatar['nombre'] ?? $_SESSION['nombre'] ?? '') . ' ' . ($user_avatar['apellidos'] ?? $_SESSION['apellidos'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="user-role-badge"><?php echo ucfirst($_SESSION['rol'] ?? 'Alumno'); ?></span>
+                        </div>
+                        <span class="arrow-down">▾</span>
+                    </button>
+
+                    <div id="userDropdown" class="dropdown-menu">
+                        <a href="dashboard.php?seccion=configuracion" class="dropdown-item">⚙️ Configuración de Perfil</a>
+                        <div class="dropdown-divider"></div>
+                        <form method="POST" action="logout.php">
+                            <?php echo csrf_field(); ?>
+                            <button type="submit" class="dropdown-item logout">🚪 Cerrar Sesión</button>
+                        </form>
+                    </div>
+                </div>
             <?php else: ?>
-                <span class="nav-badge">Acceso</span>
+                <!-- Ocultar también el botón "Iniciar sesión" cuando se esté dentro de login o registro -->
+                <?php if (!$es_pagina_auth): ?>
+                    <a href="login.php" class="btn-header-access">Iniciar sesión</a>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </header>
 
-    <div class="container">
+    <script>
+    function toggleUserDropdown() {
+        var menu = document.getElementById('userDropdown');
+        if (menu) {
+            menu.classList.toggle('active');
+        }
+    }
+
+    window.onclick = function(event) {
+        if (!event.target.closest('.user-dropdown-container')) {
+            var dropdowns = document.getElementsByClassName("dropdown-menu");
+            for (var i = 0; i < dropdowns.length; i++) {
+                dropdowns[i].classList.remove('active');
+            }
+        }
+    }
+
+    function filterGlobalCourses() {
+        var input = document.getElementById('globalSearch');
+        if (!input) return;
+        var query = input.value.toLowerCase();
+        var cards = document.querySelectorAll('.course-card-interactive');
+
+        cards.forEach(function(card) {
+            var title = card.innerText.toLowerCase();
+            if (title.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    </script>
+
+    <main style="flex: 1; display: flex; flex-direction: column;">

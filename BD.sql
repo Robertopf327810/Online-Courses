@@ -1,13 +1,16 @@
-CREATE DATABASE IF NOT EXISTS cursos_online CHARACTER SET utf8mb4;
+CREATE DATABASE IF NOT EXISTS cursos_online CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE cursos_online;
 
 -- 1. Tabla de Usuarios con Roles
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
+    apellidos VARCHAR(120) NOT NULL DEFAULT '',
+    descripcion TEXT NULL,
     email VARCHAR(120) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     rol ENUM('superadmin', 'director', 'ponente', 'alumno') NOT NULL DEFAULT 'alumno',
+    foto VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -16,9 +19,24 @@ CREATE TABLE IF NOT EXISTS cursos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     titulo VARCHAR(150) NOT NULL,
     descripcion TEXT NULL,
-    ponente_id INT NOT NULL,
+    instructor_id INT NULL,
+    categoria VARCHAR(100) NOT NULL DEFAULT 'General',
+    nivel VARCHAR(50) NOT NULL DEFAULT 'Todos los niveles',
+    foto_curso VARCHAR(500) NULL,
+    banner_curso VARCHAR(500) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ponente_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    FOREIGN KEY (instructor_id) REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS lecciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    curso_id INT NOT NULL,
+    titulo VARCHAR(150) NOT NULL,
+    contenido TEXT NULL,
+    duracion VARCHAR(50) NULL,
+    video_url VARCHAR(500) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE
 );
 
 -- 3. Inscripciones (Add / Remove Alumnos)
@@ -79,11 +97,54 @@ CREATE TABLE IF NOT EXISTS chat_mensajes (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
--- USUARIOS DE PRUEBA (Contraseña de todos: password123)
--- Hash generado con PASSWORD_DEFAULT
-INSERT INTO usuarios (nombre, email, password, rol) VALUES
-('Super Administrador', 'admin@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'superadmin'),
-('Director Académico', 'director@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'director'),
-('Prof. Roberto Ponente', 'ponente@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'ponente'),
-('Juan Alumno', 'alumno@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'alumno')
-ON DUPLICATE KEY UPDATE nombre=VALUES(nombre);
+-- Cuentas de prueba. La contraseña del alumno es alumno123.
+INSERT INTO usuarios (nombre, apellidos, email, password, rol) VALUES
+('Super', 'Administrador', 'admin@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'superadmin'),
+('Director', 'Académico', 'director@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'director'),
+('Roberto', 'Ponente', 'ponente@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'ponente'),
+('Juan', 'Alumno', 'alumno@cursos.com', '$2y$12$/Mfla.ZUJSVro27fZ5YV/eAZlQ99A2NqT2FlnzubG4DD4nHn/e3Xy', 'alumno')
+ON DUPLICATE KEY UPDATE nombre=VALUES(nombre), apellidos=VALUES(apellidos);
+
+INSERT INTO cursos (titulo, descripcion, instructor_id, categoria, nivel, foto_curso, banner_curso)
+SELECT 'Desarrollo Web Full Stack con PHP',
+       'Aprende a construir plataformas dinámicas, seguras y modulares utilizando PHP, MySQL y CSS3.',
+       id, 'Desarrollo Web', 'Intermedio',
+       'https://images.unsplash.com/photo-1599507593499-a3f7d7d97667?auto=format&fit=crop&w=600&q=80',
+       'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80'
+FROM usuarios
+WHERE email = 'ponente@cursos.com' AND rol = 'ponente'
+  AND NOT EXISTS (SELECT 1 FROM cursos WHERE titulo = 'Desarrollo Web Full Stack con PHP');
+
+INSERT INTO cursos (titulo, descripcion, instructor_id, categoria, nivel, foto_curso, banner_curso)
+SELECT 'Bases de Datos Relacionales y SQL',
+       'Aprende normalización, consultas y fundamentos de MySQL.',
+       id, 'Bases de Datos', 'Avanzado',
+       'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&w=600&q=80',
+       'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80'
+FROM usuarios
+WHERE email = 'ponente@cursos.com' AND rol = 'ponente'
+  AND NOT EXISTS (SELECT 1 FROM cursos WHERE titulo = 'Bases de Datos Relacionales y SQL');
+
+INSERT INTO lecciones (curso_id, titulo, contenido, duracion)
+SELECT c.id, 'Introducción a PHP', 'Conoce la sintaxis básica y el entorno de ejecución de PHP.', '15 min'
+FROM cursos c
+WHERE c.titulo = 'Desarrollo Web Full Stack con PHP'
+  AND NOT EXISTS (SELECT 1 FROM lecciones WHERE curso_id = c.id AND titulo = 'Introducción a PHP');
+
+INSERT INTO lecciones (curso_id, titulo, contenido, duracion)
+SELECT c.id, 'Conexión con MySQL', 'Aprende a conectar tu aplicación PHP con una base de datos MySQL.', '20 min'
+FROM cursos c
+WHERE c.titulo = 'Desarrollo Web Full Stack con PHP'
+  AND NOT EXISTS (SELECT 1 FROM lecciones WHERE curso_id = c.id AND titulo = 'Conexión con MySQL');
+
+INSERT INTO lecciones (curso_id, titulo, contenido, duracion)
+SELECT c.id, 'Fundamentos de bases de datos', 'Repasa tablas, relaciones y claves para estructurar información.', '18 min'
+FROM cursos c
+WHERE c.titulo = 'Bases de Datos Relacionales y SQL'
+  AND NOT EXISTS (SELECT 1 FROM lecciones WHERE curso_id = c.id AND titulo = 'Fundamentos de bases de datos');
+
+UPDATE cursos c
+JOIN usuarios u ON u.email = 'ponente@cursos.com' AND u.rol = 'ponente'
+SET c.instructor_id = u.id
+WHERE c.instructor_id IS NULL
+  AND c.titulo IN ('Desarrollo Web Full Stack con PHP', 'Bases de Datos Relacionales y SQL');
