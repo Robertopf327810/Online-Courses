@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS curso_alumnos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     curso_id INT NOT NULL,
     alumno_id INT NOT NULL,
+    estado ENUM('pendiente', 'aprobado') NOT NULL DEFAULT 'pendiente',
+    aprobado_por_director TINYINT(1) NOT NULL DEFAULT 0,
+    aprobado_por_admin TINYINT(1) NOT NULL DEFAULT 0,
     fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY (curso_id, alumno_id),
     FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE,
@@ -86,6 +89,33 @@ CREATE TABLE IF NOT EXISTS calificaciones (
     FOREIGN KEY (alumno_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS leccion_actividades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    curso_id INT NOT NULL,
+    leccion_id INT NOT NULL,
+    titulo VARCHAR(180) NOT NULL,
+    descripcion TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_actividad_leccion (curso_id, leccion_id),
+    KEY idx_actividad_curso (curso_id),
+    KEY idx_actividad_leccion (leccion_id),
+    FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE,
+    FOREIGN KEY (leccion_id) REFERENCES lecciones(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS calificaciones_actividad (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    actividad_id INT NOT NULL,
+    alumno_id INT NOT NULL,
+    calificacion DECIMAL(5, 2) NOT NULL,
+    comentarios TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_actividad_alumno (actividad_id, alumno_id),
+    KEY idx_calificacion_alumno (alumno_id),
+    FOREIGN KEY (actividad_id) REFERENCES leccion_actividades(id) ON DELETE CASCADE,
+    FOREIGN KEY (alumno_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
 -- 7. Chat del curso
 CREATE TABLE IF NOT EXISTS chat_mensajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -102,7 +132,8 @@ INSERT INTO usuarios (nombre, apellidos, email, password, rol) VALUES
 ('Super', 'Administrador', 'admin@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'superadmin'),
 ('Director', 'Académico', 'director@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'director'),
 ('Roberto', 'Ponente', 'ponente@cursos.com', '$2y$10$4n9Hh1wYjL.QfWj68t/PVO93Uu6X0f9f3X6UuP0tT4uG7mUaV4kKy', 'ponente'),
-('Juan', 'Alumno', 'alumno@cursos.com', '$2y$12$/Mfla.ZUJSVro27fZ5YV/eAZlQ99A2NqT2FlnzubG4DD4nHn/e3Xy', 'alumno')
+('Juan', 'Alumno', 'alumno@cursos.com', '$2y$12$/Mfla.ZUJSVro27fZ5YV/eAZlQ99A2NqT2FlnzubG4DD4nHn/e3Xy', 'alumno'),
+('María', 'López', 'maria@cursos.com', '$2y$12$/Mfla.ZUJSVro27fZ5YV/eAZlQ99A2NqT2FlnzubG4DD4nHn/e3Xy', 'alumno')
 ON DUPLICATE KEY UPDATE nombre=VALUES(nombre), apellidos=VALUES(apellidos);
 
 INSERT INTO cursos (titulo, descripcion, instructor_id, categoria, nivel, foto_curso, banner_curso)
@@ -148,3 +179,23 @@ JOIN usuarios u ON u.email = 'ponente@cursos.com' AND u.rol = 'ponente'
 SET c.instructor_id = u.id
 WHERE c.instructor_id IS NULL
   AND c.titulo IN ('Desarrollo Web Full Stack con PHP', 'Bases de Datos Relacionales y SQL');
+
+INSERT INTO curso_alumnos (curso_id, alumno_id, estado, aprobado_por_director, aprobado_por_admin)
+SELECT c.id, u.id, 'aprobado', 1, 1
+FROM cursos c
+JOIN usuarios u ON u.email = 'alumno@cursos.com'
+WHERE c.instructor_id = (SELECT id FROM usuarios WHERE email = 'ponente@cursos.com')
+  AND NOT EXISTS (
+      SELECT 1 FROM curso_alumnos ca
+      WHERE ca.curso_id = c.id AND ca.alumno_id = u.id
+  );
+
+INSERT INTO curso_alumnos (curso_id, alumno_id, estado, aprobado_por_director, aprobado_por_admin)
+SELECT c.id, u.id, 'aprobado', 1, 1
+FROM cursos c
+JOIN usuarios u ON u.email = 'maria@cursos.com'
+WHERE c.instructor_id = (SELECT id FROM usuarios WHERE email = 'ponente@cursos.com')
+  AND NOT EXISTS (
+      SELECT 1 FROM curso_alumnos ca
+      WHERE ca.curso_id = c.id AND ca.alumno_id = u.id
+  );

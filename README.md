@@ -8,3 +8,5 @@
 4. Configura el servidor web para servir este directorio con PHP y MySQLi habilitado. La aplicación crea `uploads/` cuando se sube la primera foto.
 
 La instalación de ejemplo crea dos cursos y lecciones para el usuario `ponente@cursos.com` definido en `BD.sql`. El perfil permite guardar nombre, apellidos y una descripción personal. En bases existentes, ejecuta la migración para agregar las columnas que falten. Los datos ficticios son solo para desarrollo; reemplázalos antes de publicar la aplicación.
+
+Los superadministradores pueden asignar cada curso a una cuenta con rol de docente desde **Mis Cursos**. Los docentes solo ven los cursos asignados a su cuenta.
